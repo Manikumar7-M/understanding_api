@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FastAPI SQLite Users</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: #f4f7fb;
+        color: #182230;
+        font-family: Arial, sans-serif;
+      }
+      main {
+        width: min(100%, 900px);
+        padding: 28px;
+        border-radius: 14px;
+        background: white;
+        box-shadow: 0 10px 30px rgba(24, 34, 48, 0.12);
+      }
+      h1 { margin-top: 0; font-size: 1.55rem; }
+      p { color: #5d6877; }
+      form { display: grid; gap: 14px; }
+      label { display: grid; gap: 6px; font-weight: 600; }
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #c7d0dc;
+        border-radius: 8px;
+        font: inherit;
+      }
+      button {
+        padding: 11px 14px;
+        border: 0;
+        border-radius: 8px;
+        background: #1667d9;
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:hover { background: #0f55b6; }
+      #status { min-height: 1.5em; margin: 16px 0 8px; }
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 10px; border-bottom: 1px solid #e4e8ee; text-align: left; }
+      th { background: #f4f7fb; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>User database</h1>
+      <p>Each form submission is saved in the SQLite database.</p>
+
+      <form id="user-form">
+        <label>
+          Name
+          <input id="name" name="name" required />
+        </label>
+        <label>
+          Age
+          <input id="age" name="age" type="number" min="0" required />
+        </label>
+        <label>
+          Gender
+          <input id="gender" name="gender" required />
+        </label>
+        <label>
+          Place
+          <input id="place" name="place" required />
+        </label>
+        <button type="submit">Add user</button>
+      </form>
+
+      <p id="status" aria-live="polite"></p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Age</th>
+              <th>Gender</th>
+              <th>Place</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="user-list">
+            <tr><td colspan="6">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+
+    <script>
+      const form = document.querySelector("#user-form");
+      const status = document.querySelector("#status");
+      const userList = document.querySelector("#user-list");
+
+      function addCell(row, value) {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.append(cell);
+      }
+
+      function renderUsers(users) {
+        userList.replaceChildren();
+
+        if (users.length === 0) {
+          const row = document.createElement("tr");
+          const cell = document.createElement("td");
+          cell.colSpan = 6;
+          cell.textContent = "No users saved yet.";
+          row.append(cell);
+          userList.append(row);
+          return;
+        }
+
+        for (const user of users) {
+          const row = document.createElement("tr");
+          addCell(row, user.id);
+          addCell(row, user.name);
+          addCell(row, user.age);
+          addCell(row, user.gender);
+          addCell(row, user.place);
+          addCell(row, user.created_at);
+          userList.append(row);
+        }
+      }
+
+      async function loadUsers() {
+        try {
+          const response = await fetch("/users");
+          if (!response.ok) throw new Error("Could not load users");
+          renderUsers(await response.json());
+        } catch (error) {
+          userList.innerHTML = `<tr><td colspan="6">${error.message}</td></tr>`;
+        }
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        status.textContent = "Saving...";
+
+        const formData = new FormData(form);
+        const data = {
+          name: formData.get("name").trim(),
+          age: Number(formData.get("age")),
+          gender: formData.get("gender").trim(),
+          place: formData.get("place").trim(),
+        };
+
+        try {
+          const response = await fetch("/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+          if (!response.ok) throw new Error("Could not save data");
+
+          form.reset();
+          status.textContent = "Saved successfully.";
+          await loadUsers();
+        } catch (error) {
+          status.textContent = error.message;
+        }
+      });
+
+      loadUsers();
+    </script>
+  </body>
+</html>
